@@ -1,0 +1,96 @@
+<html>
+
+<head>
+    <link rel="stylesheet" type="text/css" href="main.css">
+    <title>Visualizer</title>
+</head>
+
+<body>
+
+<div id="scene_render" style="display: none;">
+    <button class="button" id="button_to_settings" onclick="vis.renderStop();">
+        НАЗАД
+    </button>
+    <span id="status_line">
+        УЧАСТНИК: name_placeholder
+    </span>
+    
+    <div>
+        <canvas id="main_canvas" width="1000" height="800"></canvas>
+    </div>
+</div>
+
+<div id="scene_settings">
+    <h2>Визуализатор для задачи "По всей галактике"</h2>
+
+    <p id="p_select_input" onchange="vis.updateInputSettings();">
+        Выберите входные данные:
+        <select id="select_input">
+            <option value="pretest" selected>Претест</option>
+            <option value="pre1">Предварительный тест 1</option>
+            <option value="pre2">Предварительный тест 2</option>
+            <option value="custom_input">Задать тест</option>
+        </select>
+    </p>
+
+    <p id="p_input_image">
+        <img id="input_image" src="img/input_snapshot/pretest.png">
+    </p>
+
+    <p id="p_input" style="display: none;">
+        Введите свои входные данные <br>
+        <textarea id="data_input_container" cols="60" rows="15">
+            9
+            550 100
+            700 100
+            850 100
+            550 250
+            700 250
+            850 250
+            550 400
+            700 400
+            850 400
+            15
+            2 5 321
+            3 6 342
+            4 9 1550
+            4 5 612
+            2 7 936
+            1 2 681
+            4 7 455
+            3 4 595
+            6 9 484
+            1 4 411
+            5 8 498
+            6 7 1366
+            2 9 1536
+            1 6 637
+            7 8 734
+        </textarea>
+    </p>
+
+    <p id="p_select_output" onchange="vis.updateInputSettings();">
+        Выберите ответ:
+        <select id="select_output">
+            <option value="custom_output" selected>Задать ответ</option>
+        </select>
+    </p>
+
+    <p id="p_output">
+        Введите свой ответ <br>
+        <textarea id="data_output_container" cols="60" rows="10"></textarea>
+    </p>
+
+    <p id="p_start_button">
+        <button class="button" onclick="vis.loadData(); vis.renderStart();"> ЗАПУСТИТЬ </button>
+    </p>
+</div>
+
+
+<script type="text/javascript" src="preset_data.js"></script>
+<script type="text/javascript" src="main.js"></script>
+
+
+</body>
+
+</html>
