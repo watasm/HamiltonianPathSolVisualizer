@@ -186,7 +186,7 @@ class Visualizer {
     }
 
     renderStep() {
-        this.current_time_moment += this.path_total_w / 1000;
+        this.current_time_moment += this.path_total_w / 2000;
 
         this.render(this.current_time_moment);
     }
