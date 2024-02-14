@@ -181,6 +181,8 @@ class Visualizer {
         this.current_time_moment = 0;
 
         this.interval_object = setInterval(() => {this.renderStep();}, 20);
+
+        this.logExportDirectLink();
     }
 
     renderStep() {
@@ -193,6 +195,15 @@ class Visualizer {
         clearInterval(this.interval_object);
 
         this.setScene("settings");
+    }
+
+    logExportDirectLink() {
+        var data = {
+            "select_input_value": this.select_input.value,
+            "data_output_container_value": this.data_output_container.value
+        };
+
+        console.log("https://atstng.github.io/HamiltonianPathSolVisualizer/index.html?auto=" + btoa(JSON.stringify(data)));
     }
 
     setScene(scene_name) {
@@ -361,3 +372,4 @@ class Visualizer {
 }
 
 var vis = new Visualizer();
+

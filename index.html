@@ -90,6 +90,30 @@
 <script type="text/javascript" src="preset_data.js"></script>
 <script type="text/javascript" src="main.js"></script>
 
+<script type="text/javascript">
+    const queryString = window.location.search;
+    const urlParams = new URLSearchParams(queryString);
+    const autoParam = urlParams.get('auto');
+
+    console.log(autoParam);
+
+    if (autoParam) {
+        var data = JSON.parse(atob(autoParam));
+
+        console.log(data);
+
+        var select_input = document.getElementById('select_input');
+        var data_output_container = document.getElementById('data_output_container');
+
+        select_input.value = data.select_input_value;
+        data_output_container.value = data.data_output_container_value;
+
+        vis.updateInputSettings();
+
+        vis.loadData();
+        vis.renderStart();
+    }
+</script>
 
 </body>
 
