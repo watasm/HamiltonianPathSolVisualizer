@@ -289,7 +289,7 @@ class Visualizer {
         var visual_time = Math.min(this.current_time_moment, this.path_total_w);
 
         this.status_line.innerHTML = 
-            `УЧАСТНИК: name_placeholder ` + 
+            //`УЧАСТНИК: name_placeholder ` + 
             `РЕЗУЛЬТАТ: ${this.final_score} ` + 
             `ПЛАНЕТЫ: ${currently_visited_planets} / ${this.n} ` +
             `ВРЕМЯ: ${this.formatFloat(visual_time)}`;
