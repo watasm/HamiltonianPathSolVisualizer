@@ -7,6 +7,7 @@ class Visualizer {
 
         this.data_input_container  = document.getElementById("data_input_container");
         this.data_output_container = document.getElementById("data_output_container");
+        this.data_extra_container  = document.getElementById("data_extra_container");
 
         this.canvas = document.getElementById("main_canvas");
         this.canvas_ctx = this.canvas.getContext("2d");
@@ -25,6 +26,28 @@ class Visualizer {
         // backgrounds
         this.background_image = new Image();
         this.background_image.src = "img/background/AdobeStock_391723551.jpeg";
+
+        // color scheme
+        this.color_scheme = {
+            'planet_colors': {
+                1: {'fill': 'rgb(255, 255, 255)', 'stroke': 'rgb(190, 190, 190)'},
+                2: {'fill': 'rgb(172, 98,  255)', 'stroke': 'rgb(91,  0,   191)'},
+                3: {'fill': 'rgb(117, 117, 255)', 'stroke': 'rgb(0,   0,   233)'},
+                4: {'fill': 'rgb(239, 228, 176)', 'stroke': 'rgb(255, 200, 14 )'},
+                5: {'fill': 'rgb(153, 217, 234)', 'stroke': 'rgb(0,   162, 232)'},
+                6: {'fill': 'rgb(255, 125, 213)', 'stroke': 'rgb(217, 0,   147)'},
+            },
+            'zone_colors': {
+                1: {'fill': 'rgba(255, 255, 255, 0.25)', 'stroke': 'rgba(190, 190, 190, 0.25)'},
+                2: {'fill': 'rgba(172, 98,  255, 0.25)', 'stroke': 'rgba(91,  0,   191, 0.25)'},
+                3: {'fill': 'rgba(117, 117, 255, 0.25)', 'stroke': 'rgba(0,   0,   233, 0.25)'},
+                4: {'fill': 'rgba(239, 228, 176, 0.25)', 'stroke': 'rgba(255, 200, 14,  0.25)'},
+                5: {'fill': 'rgba(153, 217, 234, 0.25)', 'stroke': 'rgba(0,   162, 232, 0.25)'},
+                6: {'fill': 'rgba(255, 125, 213, 0.25)', 'stroke': 'rgba(217, 0,   147, 0.25)'},
+            },
+            'visited_planet': {'fill': 'rgb(64, 255, 64)', 'stroke': 'green'},
+            'ship': {'fill': 'rgb(255, 64, 64)', 'stroke': 'red'}
+        }
     }
 
     updateInputSettings() {
@@ -34,6 +57,7 @@ class Visualizer {
         if (this.select_input.value == "custom_input") {
             this.p_input.style.display = "block";
             this.data_input_container.value = "";
+            this.data_extra_container.value = "";
         }
 
         if (this.select_input.value != "custom_input") {
@@ -41,8 +65,8 @@ class Visualizer {
             this.input_image.src = `img/input_snapshot/${this.select_input.value}.png`;
 
             this.data_input_container.value = PRESET_DATA[`input_${this.select_input.value}`];
+            this.data_extra_container.value = PRESET_DATA[`extra_${this.select_input.value}`];
         }
-        
     }
 
     loadData() {
@@ -52,15 +76,16 @@ class Visualizer {
             path: []
         };
 
-        this.loadInputData();
-        this.loadOutputData();
-
         // constants
         this.width = 1800;
         this.height = 900;
 
         this.canvas.width = this.width;
         this.canvas.height = this.height;
+
+        // load
+        this.loadInputData();
+        this.loadOutputData();
 
         // adjust data
         this.data.path = this.data.path.map((x) => x - 1);
@@ -112,6 +137,13 @@ class Visualizer {
     }
 
     loadInputData() {
+        var extr = this.data_extra_container.value
+            .trim()
+            .split(/\r?\n/)
+            .map((line) => line.trim().split(" ").map((x) => parseInt(x)));
+
+        var planet_colors = extr[0];
+
         var inp = this.data_input_container.value
             .trim()
             .split(/\r?\n/)
@@ -125,9 +157,12 @@ class Visualizer {
         for (var i = 0; i < n; i++) {
             var x = inp[pos][0];
             var y = inp[pos][1];
+            var color = (planet_colors[i] || 1);
+            var zone_index = 5 * Math.floor(3 * y / this.height) + Math.floor(5 * x / this.width);
+
             pos++;
 
-            this.data.vertices.push({"x": x, "y": y});
+            this.data.vertices.push({"x": x, "y": y, "color": color, "zone_index": zone_index});
         }
 
         var m = parseInt(inp[pos][0]); pos++;
@@ -266,13 +301,20 @@ class Visualizer {
             a_visited_at = b_visited_at;
         }
         
-        // vertices
+        // vertices && zones info
         var currently_visited_planets = 0;
+        var zones_info = Array.from(Array(15), () => { return {'color': 0, 'visited_at': Infinity}; });
 
         for (let v of this.vertices) {
             var visited = v.visited_at <= time_moment;
+            var cur_zone = zones_info[v.zone_index];
 
             if (visited) currently_visited_planets += 1;
+
+            if (cur_zone.visited_at > v.visited_at) {
+                cur_zone.visited_at = v.visited_at;
+                cur_zone.color = v.color;
+            }
 
             this.renderVertex(v, visited);
         }
@@ -280,6 +322,33 @@ class Visualizer {
         // ship
         if (0 <= time_moment && time_moment < this.path_total_w) {
             this.renderShip(ship_pos);
+        }
+
+        // zones
+        for (var zone_index = 0; zone_index < 15; zone_index++) {
+            var x0 = zone_index % 5;
+            var y0 = Math.floor(zone_index / 5);
+            var zone = zones_info[zone_index];
+
+            if (zone.visited_at > time_moment) continue;
+
+            this.setColorScheme(this.color_scheme.zone_colors[zone.color]);
+
+            var zone_width = this.width / 5;
+            var zone_height = this.height / 3;
+
+            ctx.beginPath();
+            ctx.rect(
+                x0 * zone_width, y0 * zone_height,
+                zone_width, zone_height
+            );
+            ctx.fill();
+
+            this.setColorScheme(this.color_scheme.planet_colors[zone.color]);
+            ctx.strokeStyle = "black";
+            ctx.font = "bold 48px system-ui";
+            ctx.fillText(`${zone.color}`, x0 * zone_width + 5, y0 * zone_height + 50);
+            ctx.strokeText(`${zone.color}`, x0 * zone_width + 5, y0 * zone_height + 50);
         }
 
         // progress bar
@@ -318,11 +387,9 @@ class Visualizer {
         ctx.lineWidth = 1;
 
         if (visited) {
-            ctx.fillStyle = "rgb(64, 255, 64)";
-            ctx.strokeStyle = "green";
+            this.setColorScheme(this.color_scheme.visited_planet);
         } else {
-            ctx.fillStyle = "white";
-            ctx.strokeStyle = "rgb(255, 189, 250)";
+            this.setColorScheme(this.color_scheme.planet_colors[p.color]);
         }
 
         const radius = 8;
@@ -341,8 +408,7 @@ class Visualizer {
         
         ctx.lineWidth = 1;
 
-        ctx.fillStyle = "rgb(255, 64, 64)";
-        ctx.strokeStyle = "red";
+        this.setColorScheme(this.color_scheme.ship);
 
         const radius = 8;
 
@@ -364,6 +430,13 @@ class Visualizer {
         ctx.beginPath();
         ctx.rect(0, 0, this.width * time_moment / this.path_total_w, 10);
         ctx.fill();
+    }
+
+    setColorScheme(scheme) {
+        var ctx = this.canvas_ctx;
+
+        ctx.strokeStyle = scheme.stroke;
+        ctx.fillStyle   = scheme.fill;
     }
 
     formatFloat(x) {
