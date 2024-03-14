@@ -1,4 +1,24 @@
+function identity(t) {
+    return t;
+}
 
+function easeInOutCubic(x) {
+    return x < 0.5 ? 4 * x * x * x : 1 - Math.pow(-2 * x + 2, 3) / 2;
+}
+
+function interpolate2(start, end, t_start, t_end, t, f=identity) {
+    if (t < t_start) t = t_start;
+    if (t > t_end) t = t_end;
+
+    t = (t - t_start) / (t_end - t_start);
+
+    t = f(t);
+
+    return {
+        x: start.x * (1 - t) + end.x * t,
+        y: start.y * (1 - t) + end.y * t
+    };
+}
 
 class Visualizer {
     constructor() {
@@ -10,7 +30,6 @@ class Visualizer {
         this.data_extra_container  = document.getElementById("data_extra_container");
 
         this.canvas = document.getElementById("main_canvas");
-        this.canvas_ctx = this.canvas.getContext("2d");
         this.status_line = document.getElementById("status_line");
 
         this.p_select_input  = document.getElementById("p_select_input");
@@ -23,9 +42,15 @@ class Visualizer {
         this.p_output        = document.getElementById("p_output");
         this.p_start_button  = document.getElementById("p_start_button");
 
-        // backgrounds
+        // images
         this.background_image = new Image();
         this.background_image.src = "img/background/AdobeStock_391723551.jpeg";
+
+        this.planet_images = new Array(7);
+        for (var pi = 1; pi <= 6; pi++) {
+            this.planet_images[pi] = new Image();
+            this.planet_images[pi].src = `img/planets/${pi}.png`;
+        }
 
         // color scheme
         this.color_scheme = {
@@ -76,12 +101,8 @@ class Visualizer {
             path: []
         };
 
-        // constants
-        this.width = 1800;
-        this.height = 900;
-
-        this.canvas.width = this.width;
-        this.canvas.height = this.height;
+        // prepare canvas_ctx
+        this.updateCanvas();
 
         // load
         this.loadInputData();
@@ -158,7 +179,7 @@ class Visualizer {
             var x = inp[pos][0];
             var y = inp[pos][1];
             var color = (planet_colors[i] || 1);
-            var zone_index = 5 * Math.floor(3 * y / this.height) + Math.floor(5 * x / this.width);
+            var zone_index = 5 * Math.floor(3 * y / this.map_height) + Math.floor(5 * x / this.map_width);
 
             pos++;
 
@@ -213,17 +234,28 @@ class Visualizer {
     renderStart() {
         this.setScene("render");
 
-        this.current_time_moment = 0;
+        this.render_interval = 20;
+        this.rel_play_dur = 2000;
 
-        this.interval_object = setInterval(() => {this.renderStep();}, 20);
+        this.current_time_moment = 0;
+        
+        this.interval_object = setInterval(() => {this.renderStep();}, this.render_interval);
 
         this.logExportDirectLink();
     }
 
     renderStep() {
-        this.current_time_moment += this.path_total_w / 2000;
+        this.current_time_moment += this.render_interval;
 
-        this.render(this.current_time_moment);
+        this.render();
+    }
+
+    timeToPath(tm) {
+        return tm * this.path_total_w / (this.rel_play_dur * this.render_interval);
+    }
+
+    pathToTime(pm) {
+        return pm * (this.rel_play_dur * this.render_interval) / this.path_total_w;
     }
 
     renderStop() {
@@ -248,11 +280,52 @@ class Visualizer {
         document.getElementById("scene_" + scene_name).style.display = "block";
     }
 
-    render(time_moment) {
+    updateCanvas() {
+        // constants
+        this.map_width = 1800;
+        this.map_height = 900;
+
+        this.table_cell_size = 200;
+        this.table_width  = 5 * this.table_cell_size;
+        this.table_height = 3 * this.table_cell_size;
+
+        this.table_x = this.map_width + 50;
+        this.table_y = 0;
+
+        this.total_width = this.map_width + 50 + this.table_width;
+        this.total_height = this.map_height;
+
+        // canvas ctx
+        this.canvas.width = window.innerWidth - 30;
+        this.canvas.height = window.innerHeight - 100;
+
+        var scale_ratio = Math.min(
+            this.canvas.width / this.total_width,
+            this.canvas.height / this.total_height 
+        );
+
+        this.canvas_ctx = this.canvas.getContext("2d");
+        this.canvas_ctx.scale(scale_ratio, scale_ratio);
+    }
+
+    render() {
         var ctx = this.canvas_ctx;
 
-        // background & reset
-        ctx.drawImage(this.background_image, 0, 0, 3000 / 1.5, 2000 / 1.5);
+        var time_moment = this.timeToPath(this.current_time_moment);
+
+        // reset
+        ctx.fillStyle = 'black';
+        ctx.beginPath();
+        ctx.rect(0, 0, this.total_width, this.total_height);
+        ctx.fill();
+
+        // background
+        ctx.drawImage(this.background_image, 0, 0, 3000 * 0.6, 2000 * 0.6);
+
+        ctx.fillStyle = 'black';
+        ctx.beginPath();
+        ctx.rect(0, this.map_height, this.total_width, this.total_height);
+        ctx.fill();
         
         // edges
         for (let draw_visited of [false, true])  {
@@ -333,8 +406,8 @@ class Visualizer {
             if (zone.visited_at > time_moment) continue;
             
             // visuals
-            var zone_width = this.width / 5;
-            var zone_height = this.height / 3;
+            var zone_width = this.map_width / 5;
+            var zone_height = this.map_height / 3;
 
             this.setColorScheme(this.color_scheme.zone_colors[zone.vertex.color]);
             ctx.beginPath();
@@ -357,8 +430,138 @@ class Visualizer {
         // progress bar
         this.renderProgressBar(time_moment);
 
+        // table
+        ctx.fillStyle = "grey";
+        ctx.strokeStyle = "grey";
+
+        {
+            var x = this.table_x;
+            var y = this.table_y;
+            var tcs = this.table_cell_size;
+            
+            for (var j = 0; j <= 5; j++) {
+                ctx.beginPath();
+                ctx.moveTo(x + j*tcs, y + 0*tcs);
+                ctx.lineTo(x + j*tcs, y + 3*tcs);
+                ctx.stroke();
+            }
+            for (var i = 0; i <= 3; i++) {
+                ctx.beginPath();
+                ctx.moveTo(x + 0*tcs, y + i*tcs);
+                ctx.lineTo(x + 5*tcs, y + i*tcs);
+                ctx.stroke();
+            }
+        }
+
+        // planets
+        var zones_with_animation_complete = 0;
+
+        for (var zone_index = 0; zone_index < 15; zone_index++) {
+            var x0 = zone_index % 5;
+            var y0 = Math.floor(zone_index / 5);
+            var zone = zones_info[zone_index];
+
+            if (zone.visited_at > time_moment) continue;
+
+            // keyframes
+            var kf0 = zone.visited_at;
+            var kf1 = kf0 + this.timeToPath(1000);
+            var kf2 = kf1 + this.timeToPath(2000);
+            
+            var zone_width = this.map_width / 5;
+            var zone_height = this.map_height / 3;
+            
+            const tx = this.table_x;
+            const ty = this.table_y;
+            const tcs = this.table_cell_size;
+
+            var cell_center = {
+                x: tx + tcs * (x0 + 0.5),
+                y: ty + tcs * (y0 + 0.5)
+            };
+            var zone_center = {
+                x: zone_width * (x0 + 0.5),
+                y: zone_height * (y0 + 0.5)
+            };
+
+            var p = {x: 0, y: 0};
+            var scale = 0.5;
+
+            if (kf0 <= time_moment && time_moment < kf1) {
+                p = interpolate2(zone.vertex, zone_center, kf0, kf1, time_moment);
+                scale = 0.5 * (time_moment - kf0) / (kf1 - kf0);
+            }
+
+            if (kf1 <= time_moment && time_moment < kf2) {
+                p = interpolate2(zone_center, cell_center, kf1, kf2, time_moment, easeInOutCubic);
+            }
+
+            if (kf2 <= time_moment) {
+                zones_with_animation_complete++;
+                p = cell_center;
+            }
+            
+            this.renderTablePlanet(p, zone.vertex.color, scale);
+        }
+
+        // crossline
+        if (zones_with_animation_complete == 15) {
+            // seq_by_row contains 8-connected path to the left border
+            // that ends in given row or value false if it is not possible
+            var seq_by_row = [[0], [1], [2]];
+            
+            for (let jcur of [1, 2, 3, 4]) {
+                var new_seq_by_row = [false, false, false];
+
+                for (let icur of [0, 1, 2]) {
+                    for (let idelta of [-1, 0, +1]) {
+                        var iprv = icur + idelta;
+                        var jprv = jcur - 1;
+                        
+                        if (iprv < 0) continue;
+                        if (iprv >= 3) continue;
+                        if (!seq_by_row[iprv]) continue;
+
+                        var cur_color = zones_info[icur*5 + jcur].vertex.color;
+                        var prv_color = zones_info[iprv*5 + jprv].vertex.color;
+
+                        if (cur_color != prv_color) continue;
+
+                        new_seq_by_row[icur] = [...seq_by_row[iprv]].concat([icur]);
+                        break;
+                    }
+                }
+
+                seq_by_row = new_seq_by_row;
+            }
+
+            console.log(seq_by_row);
+
+            // among computed sequences find first valid one and draw it
+            var final_seq = seq_by_row.find(a => a);
+
+            if (final_seq) {
+                ctx.lineWidth = 5;
+                ctx.strokeStyle = "rgb(64, 255, 64)";
+
+                for (var j = 0; j+1 < 5; j++) {
+                    const tx = this.table_x;
+                    const ty = this.table_y;
+                    const tcs = this.table_cell_size;
+
+                    var i0 = final_seq[j+0];
+                    var i1 = final_seq[j+1];
+
+                    ctx.beginPath();
+                    ctx.moveTo(tx + tcs * (0.5 + j+0), ty + tcs * (0.5 + i0));
+                    ctx.lineTo(tx + tcs * (0.5 + j+1), ty + tcs * (0.5 + i1));
+                    ctx.stroke();
+                }
+            }
+        }
+
         // update status
-        var visual_time = Math.min(this.current_time_moment, this.path_total_w);
+        var visual_time = Math.min(time_moment, this.path_total_w);
 
         this.status_line.innerHTML = 
             //`УЧАСТНИК: name_placeholder ` + 
@@ -436,9 +639,24 @@ class Visualizer {
         
         ctx.lineWidth = 1;
 
+        var bar_progress = this.map_width * Math.min(1, time_moment / this.path_total_w);
+
         ctx.beginPath();
-        ctx.rect(0, 0, this.width * time_moment / this.path_total_w, 10);
+        ctx.rect(0, 0, bar_progress, 10);
         ctx.fill();
+    }
+
+    renderTablePlanet(p, planet_index, scale=0.5) {
+        var ctx = this.canvas_ctx;
+        var img = this.planet_images[planet_index];
+
+        ctx.drawImage(
+            img,
+            p.x - scale * (img.width / 2),
+            p.y - scale * (img.height / 2),
+            scale * img.width,
+            scale * img.height
+        );
     }
 
     setColorScheme(scheme) {
@@ -455,3 +673,4 @@ class Visualizer {
 
 var vis = new Visualizer();
 
+addEventListener("resize", (event) => {vis.updateCanvas(); });
